@@ -1,207 +1,171 @@
 import _ from 'lodash'
 
 class Relastic {
-	constructor () {
-		this.composition = {query: {}}
-		this.pointer = this.composition.query
-		this.address = 'query'
-		this.parent = this.composition
+	constructor (composition = {query: {}}, keys = ['query'], root = true) {
+		this.composition = composition
+		this.keys = keys.slice()
+		this.root = root
+	}
 
-		this.initMethods()
-
-		this.initChainable()
-		return this
+	output () {
+		return clone(this.composition)
 	}
 
 	print () {
 		console.log(JSON.stringify(this.composition, null, 2))
 	}
 
-	initMethods () {
-		this.methods = []
-		var categories = {
-			queries: {
-				methods: ['match', 'match_all'],
-			},
-			filters: {
-				methods: ['term', 'terms', 'range', 'exists', 'missing'],
-			},
-			parents: {
-				methods: ['filteredQuery', 'query', 'filter', 'bool'],
-			},
-			bools: {
-				methods: ['must', 'must_not', 'should'],
-			},
+	printKeys () {
+		console.log(this.keys)
+	}
+
+	addToComposition (address, obj) {
+		var target, parent
+		var currentAddress = this.keys.join('.')
+		var lookup = currentAddress + '.' + address
+
+		if (isBool(_.last(this.keys))) {
+			parent = _.get(this.composition, currentAddress)
+			if (parent === undefined || Object.keys(parent).length === 0) {
+				_.set(this.composition, currentAddress, {[address]: obj})
+				return
+			}
+
+			if (!(parent instanceof Array)) {
+				_.set(this.composition, currentAddress, [parent])
+			}
+
+			parent = _.get(this.composition, currentAddress)
+			if (parent instanceof Array) {
+				_.set(this.composition, currentAddress, parent.concat({[address]: obj}))
+				return [_.get(this.composition, currentAddress).length - 1, address]
+			}
 		}
 
-		_.each(categories, (category, name) => {
-			_.each(category.methods, (method) => {
-				this.methods.push(method)
-			})
+		target = _.get(this.composition, lookup)
+		if (target === undefined || Object.keys(target).length === 0) {
+			_.set(this.composition, lookup, clone(obj))
+			return address
+		}
+
+
+	}
+
+	pushKey (key) {
+		this.keys = this.keys.concat(key)
+	}
+
+	addAndPush (key, obj) {
+		var nextKey = this.addToComposition(key, obj)
+		this.pushKey(nextKey)
+	}
+
+	chainable(fn) {
+		var next = new this.constructor(this.composition, this.keys, false)
+		if (next.root) {
+			next.keys = ['query']
+		}
+		fn.call(next)
+		return next
+	}
+
+	filteredQuery () {
+		return this.chainable(function () {
+			this.addToComposition('filtered.query', {})
+			this.addToComposition('filtered.filter', {})
+			this.pushKey('filtered')
 		})
 	}
 
-	initChainable () {
-		this.__chainable = {}
-		_.each(this.methods, (method) => {
-			this.__chainable[method] = makeChainable(this[method])
+	filter (obj = {}) {
+		return this.chainable(function () {
+			this.addAndPush('filter', obj)
 		})
-
-		var self = this
-		function makeChainable (fn) {
-			return function (q) {
-				return fn.call(self, q, false)
-			}
-		}
 	}
 
-
-
-	chainable (fn, root) {
-		if (root) {
-			this.pointer = this.composition.query
-		}
-
-		fn.call(this)
-		return this.__chainable
-	}
-
-	setPointer (address) {
-		if (address == undefined) {
-			return
-		}
-		this.parent = this.pointer
-		this.address = address
-		this.pointer = this.pointer[address]
-	}
-
-
-
-
-	Parent (address, obj, root = true) {
-		if (this.address === address) {
-			return this.chainable(function () {
-				this.setPointer()
-			}, root)
-		}
-
+	query (obj = {}) {
 		return this.chainable(function () {
-			if (this.pointer[address] === undefined) {
-				this.pointer[address] = clone(obj)
-			}
-			this.setPointer(address)
-		}, root)
+			this.addAndPush('query', obj)
+		})
 	}
 
-	filteredQuery (__null, root = true) {
-		return this.Parent('filtered', {query: {}, filter: {}}, root)
+	match (obj = {}) {
+		return this.Sibling('match', obj)
 	}
 
-	query (obj = {}, root = true) {
-		return this.Parent('query', obj, root)
-	}
-
-	filter (obj = {}, root = true) {
-		return this.Parent('filter', obj, root)
-	}
-
-	bool (obj = {}, root = true) {
-		return this.Parent('bool', obj, root)
-	}
-
-
-	isBool (address) {
-		return ['should', 'must', 'must_not'].indexOf(address) !== -1
-	}
-
-	Bool (address, obj, root = true) {
-		if (this.address === address) {
-			return this.chainable(function () {
-				this.setPointer()
-			}, root)
-		}
-
+	bool (obj = {}) {
 		return this.chainable(function () {
-			if (this.pointer[address] === undefined) {
-				this.pointer[address] = clone(obj)
-			}
-			this.setPointer(address)
-		}, root)
+			this.addAndPush('bool', obj)
+		})
 	}
 
-
-	should (obj = {}, root = true) {
-		return this.Bool('should', obj, root)
-	}
-
-	must (obj = {}, root = true) {
-		return this.Bool('must', obj, root)
-	}
-
-	must_not (obj = {}, root = true) {
-		return this.Bool('must_not', obj, root)
-	}
-
-	Sibling (address, obj, root = true) {
+	must (obj = {}) {
 		return this.chainable(function () {
-
-			if (this.pointer[address] === undefined) {
-				this.pointer[address] = clone(obj)
-			}
-
-			if (this.isBool(this.address)) {
-				var target = this.parent[this.address]
-				if (!(target instanceof Array)) {
-					this.parent[this.address] = [clone(target)]
-				}
-				if (target instanceof Array) {
-					this.parent[this.address].push(clone({[address]: obj}))
-				}
-
-			}
-
-			this.setPointer()
-		}, root)
+			this.addAndPush('must', obj)
+		})
 	}
 
-	match (obj, root = true) {
-		return this.Sibling('match', obj, root)
+	must_not (obj = {}) {
+		return this.chainable(function () {
+			this.addAndPush('must_not', obj)
+		})
 	}
 
-	match_all (__null, root = true) {
-		return this.Sibling('match', {}, root)
+	should (obj = {}) {
+		return this.chainable(function () {
+			this.addAndPush('should', obj)
+		})
 	}
 
-	multi_match (obj, root = true) {
-		return this.Sibling('multi_match', obj, root)
+	gotoLastParent () {
+		var lastIndex = _.findLastIndex(this.keys, (key) => isParent(key))
+		this.keys = this.keys.slice(0, lastIndex + 1)
 	}
 
-	exists (obj, root = true) {
-		return this.Sibling('exists', obj, root)
+	Sibling (method, obj) {
+		this.gotoLastParent()
+		return this.chainable(function () {
+			this.addToComposition(method, obj)
+		})
 	}
 
-	missing (obj, root = true) {
-		return this.Sibling('missing', obj, root)
+	term (obj = {}) {
+		return this.Sibling('term', obj)
 	}
 
-	term (obj, root = true) {
-		return this.Sibling('term', obj, root)
-	}
-
-	terms (obj, root = true) {
-		return this.Sibling('terms', obj, root)
-	}
-
-	range (obj, root = true) {
-		return this.Sibling('range', obj, root)
+	terms (obj = {}) {
+		return this.Sibling('terms', obj)
 	}
 
 }
 
 
 var r = new Relastic()
-r.filteredQuery().filter().bool().must().term({folder: 'inbox'})
-r.filteredQuery().filter().bool().must_not().query().match({email: 'urgent business proposal'})
+var bool = r.filteredQuery().filter().bool()
+
+bool.printKeys()
+
+
+bool
+	.must()
+		.term({folder: 'inbox'})
+		.term({hockey: 'stick'})
+		.term({sweet: 'NO'})
+		.terms({cheese: ['cheddar', 'mozarella']})
+		.bool()
+			.should()
+			.term({name: 'HEY'})
+			.term({hey: 2})
+
+bool.must_not()
+	.term({folder: 'HEY!'})
+
+// r.filteredQuery().query().match({'name': 'ANDU'})
+
+// bool.must().term({hockey: 'stick'})
+
+
+// r.filteredQuery().filter().bool().must_not().query().match({email: 'urgent business proposal'})
 	// .query()
 	// .match({email: 'urgent business proposal'})
 
@@ -211,14 +175,19 @@ r.filteredQuery().filter().bool().must_not().query().match({email: 'urgent busin
 
 // r.query()
 
-r.print()
+console.log( JSON.stringify(r.output(), null, 2) )
 
 
 
 
+function isParent (method) {
+	var parentMethods = ['bool', 'filter', 'query', 'must', 'must_not', 'should']
+	return _.contains(parentMethods, method)
+}
 
-
-
+function isBool (method) {
+	return _.contains(['must', 'must_not', 'should'], method)
+}
 
 function clone (obj) {
 	return _.clone(obj, true)
