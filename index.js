@@ -13,6 +13,10 @@ class Relastic {
 		return this
 	}
 
+	print () {
+		console.log(JSON.stringify(this.composition, null, 2))
+	}
+
 	initMethods () {
 		this.methods = []
 		var categories = {
@@ -51,12 +55,6 @@ class Relastic {
 		}
 	}
 
-	print () {
-		console.log(JSON.stringify(this.composition, null, 2))
-	}
-
-
-
 
 
 	chainable (fn, root) {
@@ -77,120 +75,141 @@ class Relastic {
 		this.pointer = this.pointer[address]
 	}
 
-	same (root) {
+
+
+
+	Parent (address, obj, root = true) {
+		if (this.address === address) {
+			return this.chainable(function () {
+				this.setPointer()
+			}, root)
+		}
+
 		return this.chainable(function () {
-			this.setPointer()
+			if (this.pointer[address] === undefined) {
+				this.pointer[address] = clone(obj)
+			}
+			this.setPointer(address)
 		}, root)
 	}
-
-
-
-
-
-
 
 	filteredQuery (__null, root = true) {
-		if (this.address === 'filtered') {
-			return this.same(root)
+		return this.Parent('filtered', {query: {}, filter: {}}, root)
+	}
+
+	query (obj = {}, root = true) {
+		return this.Parent('query', obj, root)
+	}
+
+	filter (obj = {}, root = true) {
+		return this.Parent('filter', obj, root)
+	}
+
+	bool (obj = {}, root = true) {
+		return this.Parent('bool', obj, root)
+	}
+
+
+	isBool (address) {
+		return ['should', 'must', 'must_not'].indexOf(address) !== -1
+	}
+
+	Bool (address, obj, root = true) {
+		if (this.address === address) {
+			return this.chainable(function () {
+				this.setPointer()
+			}, root)
 		}
 
 		return this.chainable(function () {
-			if (this.pointer.filtered === undefined) {
-				this.pointer.filtered = {
-					query: {},
-					filter: {},
+			if (this.pointer[address] === undefined) {
+				this.pointer[address] = clone(obj)
+			}
+			this.setPointer(address)
+		}, root)
+	}
+
+
+	should (obj = {}, root = true) {
+		return this.Bool('should', obj, root)
+	}
+
+	must (obj = {}, root = true) {
+		return this.Bool('must', obj, root)
+	}
+
+	must_not (obj = {}, root = true) {
+		return this.Bool('must_not', obj, root)
+	}
+
+	Sibling (address, obj, root = true) {
+		return this.chainable(function () {
+
+			if (this.pointer[address] === undefined) {
+				this.pointer[address] = clone(obj)
+			}
+
+			if (this.isBool(this.address)) {
+				var target = this.parent[this.address]
+				if (!(target instanceof Array)) {
+					this.parent[this.address] = [clone(target)]
 				}
+				if (target instanceof Array) {
+					this.parent[this.address].push(clone({[address]: obj}))
+				}
+
 			}
-			this.setPointer('filtered')
-		}, root)
-	}
 
-	query (queryObj, root = true) {
-		if (this.address === 'query') {
-			return this.same(root)
-		}
-
-		return this.chainable(function () {
-			if (this.pointer.query === undefined) {
-				this.pointer.query = clone(queryObj)
-			}
-			this.setPointer('query')
-		}, root)
-	}
-
-	filter (__null, root = true) {
-		if (this.address === 'filter') {
-			return this.same(root)
-		}
-
-		return this.chainable(function () {
-			if (this.pointer.filter === undefined) {
-				this.pointer.filter = clone(q)
-			}
-			this.setPointer('filter')
-		}, root)
-	}
-
-
-
-
-
-	match (queryObj, root = true) {
-		return this.chainable(function () {
-			if (this.pointer.match === undefined) {
-				this.pointer.match = clone(queryObj)
-			} else {
-				this.pointer.match = extend(this.pointer.match, queryObj)
-			}
 			this.setPointer()
 		}, root)
 	}
 
-
-
-	term (queryObj, root = true) {
-		return this.chainable(function () {
-			if (this.pointer.term === undefined) {
-				this.pointer.term = clone(queryObj)
-			} else {
-				this.pointer.term = extend(this.pointer.term, queryObj)
-			}
-			this.setPointer()
-		}, root)
+	match (obj, root = true) {
+		return this.Sibling('match', obj, root)
 	}
 
-	terms (queryObj, root = true) {
-		return this.chainable(function () {
-			if (this.pointer.terms === undefined) {
-				this.pointer.terms = clone(queryObj)
-			} else {
-				this.pointer.terms = extend(this.pointer.terms, queryObj)
-			}
-			this.setPointer()
-		}, root)
+	match_all (__null, root = true) {
+		return this.Sibling('match', {}, root)
 	}
 
-	range (queryObj, root = true) {
-		return this.chainable(function () {
-			if (this.pointer.range === undefined) {
-				this.pointer.range = clone(queryObj)
-			} else {
-				this.pointer.range = extend(this.pointer.range, queryObj)
-			}
-			this.setPointer()
-		}, root)
+	multi_match (obj, root = true) {
+		return this.Sibling('multi_match', obj, root)
+	}
+
+	exists (obj, root = true) {
+		return this.Sibling('exists', obj, root)
+	}
+
+	missing (obj, root = true) {
+		return this.Sibling('missing', obj, root)
+	}
+
+	term (obj, root = true) {
+		return this.Sibling('term', obj, root)
+	}
+
+	terms (obj, root = true) {
+		return this.Sibling('terms', obj, root)
+	}
+
+	range (obj, root = true) {
+		return this.Sibling('range', obj, root)
 	}
 
 }
 
 
-var r = new Relastic ()
-r.filteredQuery().filter()
-	.term({firstName: 'Andy'})
-	.range({age: {gte: 1, lte: 29}})
+var r = new Relastic()
+r.filteredQuery().filter().bool().must().term({folder: 'inbox'})
+r.filteredQuery().filter().bool().must_not().query().match({email: 'urgent business proposal'})
+	// .query()
+	// .match({email: 'urgent business proposal'})
+
+// bool.should()
+// 	.terms({cheese: ['Rocquefort', 'Cheddar']})
+
 
 // r.query()
-// 	.match({name: 'Andy'})
 
 r.print()
 
