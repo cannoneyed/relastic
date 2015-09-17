@@ -38,34 +38,33 @@ r.filter()
 
 r.output()
 // {
-//   query: {
-//     filter: {
-//       bool: {
-//         must: [
-//           {
-//             term: {
-//               type: 'chili pepper'
-//             }
-//           },
-//           {
-//             terms: {
-//               spiciness: ['high', 'very high']}
-//             }
+//   query: {},
+//   filter: {
+//     bool: {
+//       must: [
+//         {
+//           term: {
+//             type: 'chili pepper'
 //           }
-//         ],
-//         should: [
-//           {
-//             term: {
-//               color: 'green'
-//             }
-//           },
-//           {
-//             term: {
-//               size: 'small'
-//             }
+//         },
+//         {
+//           terms: {
+//             spiciness: ['high', 'very high']}
 //           }
-//         ]
-//       }
+//         }
+//       ],
+//       should: [
+//         {
+//           term: {
+//             color: 'green'
+//           }
+//         },
+//         {
+//           term: {
+//             size: 'small'
+//           }
+//         }
+//       ]
 //     }
 //   }
 // }
