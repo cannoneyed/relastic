@@ -11,8 +11,8 @@ Relastic uses method chaining to construct Elasticsearch queries.
 
 ```javascript
 var Relastic = require('relastic')
-
 var r = new Relastic()
+
 r.query().match({title: 'thai chili'})
 r.output()
 // {
@@ -27,7 +27,6 @@ r.output()
 This approach can be much simpler than constructing large ES queries when compared to explicitly defining and modifying complex objects.
 
 ```javascript
-var r = new Relastic()
 r.filter()
   .bool()
   .must()
@@ -75,7 +74,6 @@ r.output()
 Relastic also allows construction of query objects progressively.
 
 ```javascript
-var r = new Relastic()
 r.filteredQuery()
   .query()
   .match({ingredients: 'cayenne'})
@@ -106,7 +104,6 @@ r.output()
 Each invocation of a Relastic query constructor method returns a chainable instance of Relastic. The chain can be started anew at whatever point the final method invocation referred to.
 
 ```javascript
-var r = new Relastic()
 var bool = r.filter().bool()
 
 bool.must().term({color: 'green'})
