@@ -68,7 +68,7 @@ class Relastic {
 	}
 
 	chainable(fn) {
-		var next = new this.constructor(this.composition, this.keys, false)
+		var next = new Relastic(this.composition, this.keys, false)
 		if (next.root) {
 			next.keys = ['query']
 		}
@@ -90,14 +90,16 @@ class Relastic {
 		})
 	}
 
+	filtered (obj = {}) {
+		return this.chainable(function () {
+			this.addAndPush('filtered', obj)
+		})
+	}
+
 	query (obj = {}) {
 		return this.chainable(function () {
 			this.addAndPush('query', obj)
 		})
-	}
-
-	match (obj = {}) {
-		return this.Sibling('match', obj)
 	}
 
 	bool (obj = {}) {
@@ -124,10 +126,9 @@ class Relastic {
 		})
 	}
 
-	gotoLastParent () {
-		var lastIndex = _.findLastIndex(this.keys, (key) => isParent(key))
-		this.keys = this.keys.slice(0, lastIndex + 1)
-	}
+
+
+
 
 	Sibling (method, obj) {
 		this.gotoLastParent()
@@ -144,39 +145,45 @@ class Relastic {
 		return this.Sibling('terms', obj)
 	}
 
+	match (obj = {}) {
+		return this.Sibling('match', obj)
+	}
+
+	match_all () {
+		return this.Sibling('match_all', {})
+	}
+
+	minimum_should_match (n = 1) {
+		if (_.last(this.keys) === 'should') {
+			this.keys.pop()
+			return this.Sibling('minimum_should_match', n)
+		} else {
+			return
+		}
+	}
+
+	range (obj = {}) {
+		return this.Sibling('range', obj)
+	}
+
+	exists (obj = {}) {
+		return this.Sibling('exists', obj)
+	}
+
+	missing (obj = {}) {
+		return this.Sibling('missing', obj)
+	}
+
+	gotoLastParent () {
+		var lastIndex = _.findLastIndex(this.keys, (key) => isParent(key))
+		this.keys = this.keys.slice(0, lastIndex + 1)
+	}
+
+
+
 }
 
-
-var r = new Relastic()
-
-// var bool = r.filteredQuery().filter().bool()
-// bool
-// 	.must()
-// 		.term({folder: 'inbox'})
-// 		.term({hockey: 'stick'})
-// 		.term({sweet: 'NO'})
-// 		.terms({cheese: ['cheddar', 'mozarella']})
-// 		.bool()
-// 			.should()
-// 			.term({name: 'HEY'})
-// 			.term({hey: 2})
-//
-// bool.must_not()
-// 	.term({folder: 'HEY!'})
-
-var r = new Relastic()
-r.filteredQuery()
-  .query()
-  .match({ingredients: 'cayenne'})
-
-r.filteredQuery()
-  .filter()
-  .term({type: 'soup'})
-
-
-console.log( JSON.stringify(r.output(), null, 2) )
-
-
+export default Relastic
 
 
 function isParent (method) {
