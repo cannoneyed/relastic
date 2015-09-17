@@ -1,7 +1,7 @@
 import _ from 'lodash'
 
 class Relastic {
-	constructor (composition = {query: {}}, keys = ['query'], root = true) {
+	constructor (composition = {query: {}}, keys = [], root = true) {
 		this.composition = composition
 		this.keys = keys.slice()
 		this.root = root
@@ -19,15 +19,20 @@ class Relastic {
 		console.log(this.keys)
 	}
 
-	addToComposition (address, obj) {
+	addToComposition (key, obj) {
 		var target, parent
 		var currentAddress = this.keys.join('.')
-		var lookup = currentAddress + '.' + address
+		var lookup = currentAddress + '.' + key
+
+		if (_.last(this.keys) === key) {
+			_.set(this.composition, currentAddress, obj)
+			return key
+		}
 
 		if (isBool(_.last(this.keys))) {
 			parent = _.get(this.composition, currentAddress)
 			if (parent === undefined || Object.keys(parent).length === 0) {
-				_.set(this.composition, currentAddress, {[address]: obj})
+				_.set(this.composition, currentAddress, {[key]: obj})
 				return
 			}
 
@@ -37,15 +42,15 @@ class Relastic {
 
 			parent = _.get(this.composition, currentAddress)
 			if (parent instanceof Array) {
-				_.set(this.composition, currentAddress, parent.concat({[address]: obj}))
-				return [_.get(this.composition, currentAddress).length - 1, address]
+				_.set(this.composition, currentAddress, parent.concat({[key]: obj}))
+				return [_.get(this.composition, currentAddress).length - 1, key]
 			}
 		}
 
 		target = _.get(this.composition, lookup)
 		if (target === undefined || Object.keys(target).length === 0) {
 			_.set(this.composition, lookup, clone(obj))
-			return address
+			return key
 		}
 
 
@@ -57,7 +62,9 @@ class Relastic {
 
 	addAndPush (key, obj) {
 		var nextKey = this.addToComposition(key, obj)
-		this.pushKey(nextKey)
+		if (key !== _.last(this.keys)) {
+			this.pushKey(nextKey)
+		}
 	}
 
 	chainable(fn) {
@@ -71,9 +78,9 @@ class Relastic {
 
 	filteredQuery () {
 		return this.chainable(function () {
-			this.addToComposition('filtered.query', {})
-			this.addToComposition('filtered.filter', {})
-			this.pushKey('filtered')
+			this.addToComposition('query.filtered.query', {})
+			this.addToComposition('query.filtered.filter', {})
+			this.pushKey(['query', 'filtered'])
 		})
 	}
 
@@ -141,39 +148,31 @@ class Relastic {
 
 
 var r = new Relastic()
-var bool = r.filteredQuery().filter().bool()
 
-bool.printKeys()
+// var bool = r.filteredQuery().filter().bool()
+// bool
+// 	.must()
+// 		.term({folder: 'inbox'})
+// 		.term({hockey: 'stick'})
+// 		.term({sweet: 'NO'})
+// 		.terms({cheese: ['cheddar', 'mozarella']})
+// 		.bool()
+// 			.should()
+// 			.term({name: 'HEY'})
+// 			.term({hey: 2})
+//
+// bool.must_not()
+// 	.term({folder: 'HEY!'})
 
+var r = new Relastic()
+r.filteredQuery()
+  .query()
+  .match({ingredients: 'cayenne'})
 
-bool
-	.must()
-		.term({folder: 'inbox'})
-		.term({hockey: 'stick'})
-		.term({sweet: 'NO'})
-		.terms({cheese: ['cheddar', 'mozarella']})
-		.bool()
-			.should()
-			.term({name: 'HEY'})
-			.term({hey: 2})
+r.filteredQuery()
+  .filter()
+  .term({type: 'soup'})
 
-bool.must_not()
-	.term({folder: 'HEY!'})
-
-// r.filteredQuery().query().match({'name': 'ANDU'})
-
-// bool.must().term({hockey: 'stick'})
-
-
-// r.filteredQuery().filter().bool().must_not().query().match({email: 'urgent business proposal'})
-	// .query()
-	// .match({email: 'urgent business proposal'})
-
-// bool.should()
-// 	.terms({cheese: ['Rocquefort', 'Cheddar']})
-
-
-// r.query()
 
 console.log( JSON.stringify(r.output(), null, 2) )
 
