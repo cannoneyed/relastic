@@ -110,18 +110,17 @@ bool.must().term({color: 'green'})
 bool.must_not().terms({spiciness: ['none', 'low', 'medium']})
 r.output()
 // {
-//   query: {
-//     filter: {
-//       bool : {
-//         must: {
-//           term: {
-//             color: 'green'
-//           }
-//         },
-//         must_not: {
-//           terms: {
-//             spiciness: ['none', 'low', 'medium']
-//           }
+//   query: {},
+//   filter: {
+//     bool : {
+//       must: {
+//         term: {
+//           color: 'green'
+//         }
+//       },
+//       must_not: {
+//         terms: {
+//           spiciness: ['none', 'low', 'medium']
 //         }
 //       }
 //     }
